@@ -1,9 +1,13 @@
+import { PHOTO_MAX_BYTES, photoDataUrlSchema } from "@/lib/contacts/photo";
 import {
   CONTACT_FIELDS,
   contactInputSchema,
   formDataToValues,
   zodFieldErrors,
 } from "@/lib/contacts/schema";
+
+const PHOTO =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
 function values(overrides: Record<string, string> = {}) {
   return {
@@ -19,6 +23,7 @@ function values(overrides: Record<string, string> = {}) {
     postal_code: "",
     country: "",
     notes: "",
+    photo: "",
     ...overrides,
   };
 }
@@ -66,6 +71,33 @@ describe("contactInputSchema", () => {
       postal_code: "Postal code must be 20 characters or fewer",
     });
   });
+
+  it("accepts an image data URL as the photo and blank as none", () => {
+    expect(contactInputSchema.parse(values({ photo: PHOTO })).photo).toBe(PHOTO);
+    expect(contactInputSchema.parse(values()).photo).toBeNull();
+  });
+
+  it("rejects a photo that is not an inline PNG, JPEG, or WebP", () => {
+    for (const photo of [
+      "https://example.com/ada.png",
+      "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+      "data:image/png;base64,@@not-base64@@",
+    ]) {
+      const result = contactInputSchema.safeParse(values({ photo }));
+      expect(zodFieldErrors(result.error!).photo).toBe(
+        "Photo must be a PNG, JPEG, or WebP image",
+      );
+    }
+  });
+
+  it("rejects a photo above the API's size cap", () => {
+    const tooBig = "A".repeat(Math.ceil((PHOTO_MAX_BYTES + 3) / 3) * 4);
+    const result = contactInputSchema.safeParse(
+      values({ photo: `data:image/jpeg;base64,${tooBig}` }),
+    );
+
+    expect(zodFieldErrors(result.error!).photo).toBe("Photo must be 512 KB or smaller");
+  });
 });
 
 describe("formDataToValues", () => {
@@ -82,5 +114,24 @@ describe("formDataToValues", () => {
     expect(Object.keys(extracted).sort()).toEqual(
       CONTACT_FIELDS.map((field) => field.name).sort(),
     );
+  });
+});
+
+describe("photo data URLs must be canonical base64", () => {
+  it.each([
+    ["data:image/png;base64,A", "a lone character"],
+    ["data:image/png;base64,A=", "an impossible one-character group"],
+    ["data:image/png;base64,AA=", "a short padded group"],
+    ["data:image/png;base64,", "an empty payload"],
+  ])("rejects %s (%s)", (value) => {
+    expect(photoDataUrlSchema.safeParse(value).success).toBe(false);
+  });
+
+  it.each([
+    "data:image/png;base64,AAAA",
+    "data:image/png;base64,AA==",
+    "data:image/jpeg;base64,AAA=",
+  ])("accepts %s", (value) => {
+    expect(photoDataUrlSchema.safeParse(value).success).toBe(true);
   });
 });

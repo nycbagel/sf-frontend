@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { photoDataUrlSchema } from "./photo";
 import type { ContactInput } from "./types";
 
 /**
@@ -52,6 +53,13 @@ export const contactInputSchema = z.object({
     .transform((value) => value || null)
     .nullable()
     .default(null),
+  // Blank means "no photo"; anything else must be a data URL the API will accept.
+  photo: z
+    .string()
+    .trim()
+    .transform((value) => value || null)
+    .pipe(photoDataUrlSchema.nullable())
+    .default(null),
 }) satisfies z.ZodType<ContactInput, unknown>;
 
 export type ContactFormValues = z.input<typeof contactInputSchema>;
@@ -77,7 +85,7 @@ export function zodFieldErrors(
 export interface ContactFieldSpec {
   name: keyof ContactInput;
   label: string;
-  type?: "text" | "email" | "tel" | "textarea";
+  type?: "text" | "email" | "tel" | "textarea" | "photo";
   required?: boolean;
   maxLength: number;
   placeholder?: string;
@@ -93,6 +101,20 @@ export interface ContactFieldGroup {
 }
 
 export const CONTACT_FIELD_GROUPS: ContactFieldGroup[] = [
+  {
+    title: "Photo",
+    description: "Shown as a round avatar; initials stand in when there is none.",
+    fields: [
+      {
+        name: "photo",
+        label: "Profile photo",
+        type: "photo",
+        // A 512 KB image is ~700 K characters once base64-encoded.
+        maxLength: 700_000,
+        wide: true,
+      },
+    ],
+  },
   {
     title: "Identity",
     description: "First name, last name, and email are required.",

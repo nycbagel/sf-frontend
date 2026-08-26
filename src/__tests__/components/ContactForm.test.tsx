@@ -25,6 +25,7 @@ describe("ContactForm", () => {
     expect(screen.getByLabelText(/^email/i)).toBeRequired();
     expect(screen.getByLabelText(/phone/i)).not.toBeRequired();
     expect(screen.getByLabelText(/notes/i).tagName).toBe("TEXTAREA");
+    expect(screen.getByLabelText(/photo/i)).toHaveAttribute("type", "file");
   });
 
   it("prefills from an existing contact", () => {
@@ -78,6 +79,26 @@ describe("ContactForm", () => {
       "aria-invalid",
       "true",
     );
+  });
+
+  it("holds the submit button while a photo is still being resized", async () => {
+    const nativeBitmap = (globalThis as { createImageBitmap?: unknown }).createImageBitmap;
+    // Never resolves: the read is still in flight for the whole test.
+    (globalThis as { createImageBitmap?: unknown }).createImageBitmap = jest.fn(
+      () => new Promise(() => {}),
+    );
+    try {
+      renderForm(jest.fn());
+
+      await userEvent.upload(
+        screen.getByLabelText(/photo/i),
+        new File(["png"], "a.png", { type: "image/png" }),
+      );
+
+      expect(screen.getByRole("button", { name: /create contact/i })).toBeDisabled();
+    } finally {
+      (globalThis as { createImageBitmap?: unknown }).createImageBitmap = nativeBitmap;
+    }
   });
 
   it("links back out without submitting", () => {
