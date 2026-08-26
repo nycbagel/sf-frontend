@@ -1,15 +1,23 @@
 import { PHOTO_MAX_BYTES, photoDataUrlSchema } from "@/lib/contacts/photo";
 import {
   CONTACT_FIELDS,
+  EMPTY_ADDRESS,
+  addressFieldName,
+  addressToFormValues,
   contactInputSchema,
   formDataToValues,
   zodFieldErrors,
 } from "@/lib/contacts/schema";
+import type { AddressFormValues, ContactFormValues } from "@/lib/contacts/types";
 
 const PHOTO =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
-function values(overrides: Record<string, string> = {}) {
+function address(overrides: Partial<AddressFormValues> = {}): AddressFormValues {
+  return { ...EMPTY_ADDRESS, ...overrides };
+}
+
+function values(overrides: Partial<ContactFormValues> = {}): ContactFormValues {
   return {
     first_name: "Ada",
     last_name: "Lovelace",
@@ -17,11 +25,7 @@ function values(overrides: Record<string, string> = {}) {
     phone: "",
     company: "",
     job_title: "",
-    address: "",
-    city: "",
-    state: "",
-    postal_code: "",
-    country: "",
+    addresses: [],
     notes: "",
     photo: "",
     ...overrides,
@@ -35,6 +39,7 @@ describe("contactInputSchema", () => {
     expect(parsed.email).toBe("ada@example.com");
     expect(parsed.phone).toBeNull();
     expect(parsed.notes).toBeNull();
+    expect(parsed.addresses).toEqual([]);
   });
 
   it("trims what the user typed", () => {
@@ -63,12 +68,12 @@ describe("contactInputSchema", () => {
 
   it("enforces the API's length limits", () => {
     const result = contactInputSchema.safeParse(
-      values({ first_name: "a".repeat(101), postal_code: "9".repeat(21) }),
+      values({ first_name: "a".repeat(101), phone: "9".repeat(41) }),
     );
 
     expect(zodFieldErrors(result.error!)).toEqual({
       first_name: "First name must be 100 characters or fewer",
-      postal_code: "Postal code must be 20 characters or fewer",
+      phone: "Phone must be 40 characters or fewer",
     });
   });
 
@@ -98,6 +103,64 @@ describe("contactInputSchema", () => {
 
     expect(zodFieldErrors(result.error!).photo).toBe("Photo must be 512 KB or smaller");
   });
+
+  describe("addresses", () => {
+    it("keeps the rows in order with blanks nulled out", () => {
+      const parsed = contactInputSchema.parse(
+        values({
+          addresses: [
+            address({ type: "work", city: " Arlington ", state: "VA" }),
+            address({ type: "home", street: "1 Market St" }),
+          ],
+        }),
+      );
+
+      expect(parsed.addresses).toEqual([
+        { type: "work", street: null, city: "Arlington", state: "VA", postal_code: null, country: null },
+        { type: "home", street: "1 Market St", city: null, state: null, postal_code: null, country: null },
+      ]);
+    });
+
+    it("drops a row that has a type but nothing else", () => {
+      const parsed = contactInputSchema.parse(
+        values({ addresses: [address({ type: "other" }), address({ city: "Oslo" })] }),
+      );
+
+      expect(parsed.addresses.map((row) => row.city)).toEqual(["Oslo"]);
+    });
+
+    it("names the row when a field is too long", () => {
+      const result = contactInputSchema.safeParse(
+        values({
+          addresses: [address({ city: "Oslo" }), address({ postal_code: "9".repeat(21) })],
+        }),
+      );
+
+      expect(zodFieldErrors(result.error!)).toEqual({
+        addresses: "Address 2: Postal code must be 20 characters or fewer",
+      });
+    });
+
+    it("rejects an unknown type", () => {
+      const result = contactInputSchema.safeParse(
+        values({ addresses: [address({ type: "vacation", city: "Oslo" })] }),
+      );
+
+      expect(zodFieldErrors(result.error!).addresses).toBe(
+        "Address 1: Choose Home, Work, or Other",
+      );
+    });
+
+    it("caps the list at the API's limit", () => {
+      const result = contactInputSchema.safeParse(
+        values({ addresses: Array.from({ length: 11 }, () => address({ city: "Oslo" })) }),
+      );
+
+      expect(zodFieldErrors(result.error!).addresses).toBe(
+        "A contact can have up to 10 addresses",
+      );
+    });
+  });
 });
 
 describe("formDataToValues", () => {
@@ -111,9 +174,40 @@ describe("formDataToValues", () => {
 
     expect(extracted.first_name).toBe("Grace");
     expect(extracted.last_name).toBe("");
+    expect(extracted.addresses).toEqual([]);
     expect(Object.keys(extracted).sort()).toEqual(
-      CONTACT_FIELDS.map((field) => field.name).sort(),
+      [...CONTACT_FIELDS.map((field) => field.name), "addresses"].sort(),
     );
+  });
+
+  it("regroups the indexed address inputs into rows, by index", () => {
+    const formData = new FormData();
+    formData.set(addressFieldName(1, "type"), "work");
+    formData.set(addressFieldName(1, "city"), "Arlington");
+    formData.set(addressFieldName(0, "type"), "home");
+    formData.set(addressFieldName(0, "street"), "1 Market St");
+    formData.set("addresses[0].bogus", "ignored");
+
+    expect(formDataToValues(formData).addresses).toEqual([
+      address({ type: "home", street: "1 Market St" }),
+      address({ type: "work", city: "Arlington" }),
+    ]);
+  });
+});
+
+describe("addressToFormValues", () => {
+  it("turns nulls into empty strings for the inputs", () => {
+    expect(
+      addressToFormValues({
+        id: 3,
+        type: "home",
+        street: null,
+        city: "Oslo",
+        state: null,
+        postal_code: null,
+        country: "Norway",
+      }),
+    ).toEqual(address({ type: "home", city: "Oslo", country: "Norway" }));
   });
 });
 

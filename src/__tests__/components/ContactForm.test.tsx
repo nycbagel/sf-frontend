@@ -26,15 +26,40 @@ describe("ContactForm", () => {
     expect(screen.getByLabelText(/phone/i)).not.toBeRequired();
     expect(screen.getByLabelText(/notes/i).tagName).toBe("TEXTAREA");
     expect(screen.getByLabelText(/photo/i)).toHaveAttribute("type", "file");
+    expect(screen.getByRole("button", { name: /add address/i })).toBeEnabled();
   });
 
-  it("prefills from an existing contact", () => {
+  it("prefills from an existing contact, one row per address", () => {
     renderForm(jest.fn(), makeContact());
 
     expect(screen.getByLabelText(/first name/i)).toHaveValue("Ada");
     expect(screen.getByLabelText(/^email/i)).toHaveValue("ada@example.com");
+    expect(screen.getByRole("group", { name: "Address 1" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^type/i)).toHaveValue("home");
+    expect(screen.getByLabelText(/city/i)).toHaveValue("San Francisco");
     // Nulls become empty inputs rather than the string "null".
     expect(screen.getByLabelText(/street address/i)).toHaveValue("");
+  });
+
+  it("posts the address rows alongside the plain fields", async () => {
+    const action = jest.fn<Promise<FormState>, [FormState, FormData]>(
+      async () => ({ status: "idle" }),
+    );
+    renderForm(action);
+
+    await userEvent.type(screen.getByLabelText(/first name/i), "Grace");
+    await userEvent.type(screen.getByLabelText(/last name/i), "Hopper");
+    await userEvent.type(screen.getByLabelText(/^email/i), "grace@example.com");
+    await userEvent.click(screen.getByRole("button", { name: /add address/i }));
+    await userEvent.selectOptions(screen.getByLabelText(/^type/i), "work");
+    await userEvent.type(screen.getByLabelText(/city/i), "Arlington");
+    await userEvent.click(screen.getByRole("button", { name: /create contact/i }));
+
+    await waitFor(() => expect(action).toHaveBeenCalled());
+
+    const formData = action.mock.calls[0][1];
+    expect(formData.get("addresses[0].type")).toBe("work");
+    expect(formData.get("addresses[0].city")).toBe("Arlington");
   });
 
   it("submits the entered values to the action", async () => {
