@@ -8,6 +8,7 @@ import {
   formDataToValues,
   zodFieldErrors,
 } from "@/lib/contacts/schema";
+import { MAX_ADDRESSES } from "@/lib/contacts/types";
 import type { AddressFormValues, ContactFormValues } from "@/lib/contacts/types";
 
 const PHOTO =
@@ -129,6 +130,42 @@ describe("contactInputSchema", () => {
       expect(parsed.addresses.map((row) => row.city)).toEqual(["Oslo"]);
     });
 
+    it("numbers a rejected row as the API will see it, ignoring dropped blanks", () => {
+      // A blank row before a bad one: the API is sent one address, so the
+      // message must say "Address 1", not "Address 2".
+      const result = contactInputSchema.safeParse(
+        values({
+          addresses: [address({ type: "home" }), address({ city: "9".repeat(121) })],
+        }),
+      );
+
+      expect(zodFieldErrors(result.error!).addresses).toMatch(/^Address 1: /);
+    });
+
+    it("counts only filled rows against the limit", () => {
+      const filled = Array.from({ length: MAX_ADDRESSES }, (_, index) =>
+        address({ city: `City ${index}` }),
+      );
+
+      const parsed = contactInputSchema.parse(
+        values({ addresses: [...filled, address({ type: "other" })] }),
+      );
+
+      expect(parsed.addresses).toHaveLength(MAX_ADDRESSES);
+    });
+
+    it("still rejects more filled rows than the API accepts", () => {
+      const result = contactInputSchema.safeParse(
+        values({
+          addresses: Array.from({ length: MAX_ADDRESSES + 1 }, (_, index) =>
+            address({ city: `City ${index}` }),
+          ),
+        }),
+      );
+
+      expect(zodFieldErrors(result.error!).addresses).toMatch(/up to 10 addresses/);
+    });
+
     it("names the row when a field is too long", () => {
       const result = contactInputSchema.safeParse(
         values({
@@ -178,6 +215,25 @@ describe("formDataToValues", () => {
     expect(Object.keys(extracted).sort()).toEqual(
       [...CONTACT_FIELDS.map((field) => field.name), "addresses"].sort(),
     );
+  });
+
+  it("ignores a file submitted for an address field", () => {
+    // A real multipart submission hands us a File here, which would otherwise
+    // stringify to "[object File]" and be stored as an address line. The entries
+    // are supplied directly because jsdom's FormData coerces on `set()`.
+    const entries: Array<[string, FormDataEntryValue]> = [
+      [addressFieldName(0, "type"), "home"],
+      [addressFieldName(0, "city"), "Oslo"],
+      [addressFieldName(0, "street"), new File(["x"], "sneaky.png", { type: "image/png" })],
+    ];
+    const formData = {
+      entries: () => entries[Symbol.iterator](),
+      get: () => null,
+    } as unknown as FormData;
+
+    expect(formDataToValues(formData).addresses).toEqual([
+      address({ type: "home", city: "Oslo" }),
+    ]);
   });
 
   it("regroups the indexed address inputs into rows, by index", () => {

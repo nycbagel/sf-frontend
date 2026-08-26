@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MapPin, Plus, Trash2 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Field from "@/components/ui/Field";
@@ -53,15 +53,34 @@ export default function AddressesField({
     setRows(toRows(initial, nextKey(rows)));
   }
 
+  // Adding and removing rows moves the DOM out from under the keyboard, so each
+  // one names where focus should land and the row/Add button claims it on mount.
+  const focusTarget = useRef<number | "add" | null>(null);
+
   function addRow() {
-    setRows((current) => [
-      ...current,
-      { key: nextKey(current), values: EMPTY_ADDRESS },
-    ]);
+    setRows((current) => {
+      const key = nextKey(current);
+      focusTarget.current = key;
+      return [...current, { key, values: EMPTY_ADDRESS }];
+    });
   }
 
   function removeRow(key: number) {
-    setRows((current) => current.filter((row) => row.key !== key));
+    setRows((current) => {
+      const index = current.findIndex((row) => row.key === key);
+      const remaining = current.filter((row) => row.key !== key);
+      // Focus the row that takes this one's place, else the last one, else Add.
+      focusTarget.current =
+        remaining[index]?.key ?? remaining[remaining.length - 1]?.key ?? "add";
+      return remaining;
+    });
+  }
+
+  /** Called by a row (or the Add button) once it is on screen. */
+  function claimFocus(owner: number | "add", element: HTMLElement | null) {
+    if (!element || focusTarget.current !== owner) return;
+    focusTarget.current = null;
+    element.focus();
   }
 
   const errorId = "field-addresses-error";
@@ -78,6 +97,9 @@ export default function AddressesField({
       {rows.map((row, index) => (
         <fieldset
           key={row.key}
+          ref={(element: HTMLFieldSetElement | null) =>
+            claimFocus(row.key, element?.querySelector<HTMLElement>("select, input") ?? null)
+          }
           aria-describedby={error ? errorId : undefined}
           className="space-y-3 rounded-lg border border-border bg-card/50 p-4"
         >
@@ -118,6 +140,7 @@ export default function AddressesField({
       <Button
         variant="secondary"
         size="sm"
+        ref={(element: HTMLButtonElement | null) => claimFocus("add", element)}
         onClick={addRow}
         disabled={rows.length >= MAX_ADDRESSES}
       >

@@ -48,15 +48,23 @@ const addressInputSchema = z.object({
   country: optionalText(120, "Country"),
 }) satisfies z.ZodType<AddressInput, unknown>;
 
-/** A row the user added but never filled in is dropped rather than rejected. */
-function hasLocation(address: AddressInput): boolean {
-  return [
-    address.street,
-    address.city,
-    address.state,
-    address.postal_code,
-    address.country,
-  ].some((part) => part !== null);
+/** The location fields of an address; `type` alone does not make a row real. */
+const LOCATION_KEYS = ["street", "city", "state", "postal_code", "country"] as const;
+
+/**
+ * A row the user added but never filled in is dropped rather than rejected.
+ *
+ * Asked of the raw row, before validation: dropping blanks first means the row
+ * limit and the row numbers in error messages both count only the addresses the
+ * API will actually be sent.
+ */
+function hasRawLocation(row: unknown): boolean {
+  if (typeof row !== "object" || row === null) return false;
+  const values = row as Record<string, unknown>;
+  return LOCATION_KEYS.some((key) => {
+    const value = values[key];
+    return typeof value === "string" && value.trim() !== "";
+  });
 }
 
 export const contactInputSchema = z.object({
@@ -72,10 +80,16 @@ export const contactInputSchema = z.object({
   phone: optionalText(40, "Phone"),
   company: optionalText(200, "Company"),
   job_title: optionalText(200, "Job title"),
+  // Blank rows are dropped first, so both the row limit and the row numbers in
+  // error messages refer to the addresses the API will actually be sent.
   addresses: z
-    .array(addressInputSchema)
-    .max(MAX_ADDRESSES, `A contact can have up to ${MAX_ADDRESSES} addresses`)
-    .transform((rows) => rows.filter(hasLocation)),
+    .array(z.unknown())
+    .transform((rows) => rows.filter(hasRawLocation))
+    .pipe(
+      z
+        .array(addressInputSchema)
+        .max(MAX_ADDRESSES, `A contact can have up to ${MAX_ADDRESSES} addresses`),
+    ),
   notes: z
     .string()
     .trim()
@@ -333,9 +347,12 @@ function addressesFromFormData(formData: FormData): AddressFormValues[] {
     const match = ADDRESS_FIELD_NAME.exec(name);
     if (!match || !isAddressField(match[2])) continue;
 
+    // A multipart File would stringify to "[object File]"; address fields are text.
+    if (typeof value !== "string") continue;
+
     const index = Number(match[1]);
     const row = rows.get(index) ?? { ...EMPTY_ADDRESS };
-    row[match[2]] = String(value);
+    row[match[2]] = value;
     rows.set(index, row);
   }
   return [...rows.entries()]

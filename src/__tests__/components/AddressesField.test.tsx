@@ -57,6 +57,33 @@ describe("AddressesField", () => {
     );
   });
 
+  it("moves focus into the row it just added", async () => {
+    render(<AddressesField initial={[]} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /add address/i }));
+
+    const [row] = rows();
+    expect(within(row).getByLabelText(/type/i)).toHaveFocus();
+  });
+
+  it("keeps focus in the list after removing a row", async () => {
+    render(<AddressesField initial={[HOME, WORK]} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /remove address 1/i }));
+
+    // The row that slid up into position 1 takes the focus, not the document body.
+    const [row] = rows();
+    expect(within(row).getByLabelText(/type/i)).toHaveFocus();
+  });
+
+  it("falls back to the Add button when the last row is removed", async () => {
+    render(<AddressesField initial={[HOME]} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /remove address 1/i }));
+
+    expect(screen.getByRole("button", { name: /add address/i })).toHaveFocus();
+  });
+
   it("stops adding at the API's limit", () => {
     render(<AddressesField initial={Array.from({ length: MAX_ADDRESSES }, () => HOME)} />);
 
