@@ -1,0 +1,22 @@
+# Qodo Code Review configuration (read from the default branch).
+# Docs: https://docs.qodo.ai/install-and-configure/configuration-overview/configuration-file
+
+[github_app]
+pr_commands = ["/agentic_describe", "/agentic_review"]
+# Keep one review comment up to date as fix-up commits land, instead of a new comment per push.
+handle_push_trigger = true
+
+[review_agent]
+comments_location_policy = "both"
+# Surface medium/low findings inline too, so nothing is hidden in the summary.
+inline_comments_severity_threshold = 1
+enable_commitable_suggestions = true
+issues_user_guidelines = """
+Review as a strict senior Next.js 16 / React 19 / TypeScript reviewer. Flag: client/server component boundary mistakes,
+server-action form fields that are not carried through the edit form (PUT is a full replace, so omitted fields are wiped),
+Zod rules that drift from the API's Pydantic limits, missing accessibility (labels, alt text, aria-*), hard-coded colours
+instead of the semantic Tailwind tokens in globals.css, hydration-unsafe code, and behaviour changes without a Jest or Playwright test.
+"""
+compliance_user_guidelines = """
+Treat the bullet list under '## Requirements' in the PR description as the acceptance criteria and report any that the diff does not satisfy.
+"""
