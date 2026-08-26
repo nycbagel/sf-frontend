@@ -6,6 +6,9 @@ type RouteContext = { params: Promise<{ id: string }> };
 /** Response headers worth passing through from the API's vCard endpoint. */
 const FILE_HEADERS = ["Content-Type", "Content-Disposition"] as const;
 
+/** Shown to the browser; the real cause (which names the API URL) stays in the server log. */
+const UNAVAILABLE = "Could not reach the Contacts API.";
+
 /**
  * `GET /contacts/[id]/vcard` — the contact as a `.vcf` download.
  *
@@ -27,7 +30,8 @@ export async function GET(
     upstream = await getContactVcard(id);
   } catch (error) {
     if (error instanceof ApiUnreachableError) {
-      return Response.json({ detail: error.message }, { status: 503 });
+      console.error(error);
+      return Response.json({ detail: UNAVAILABLE }, { status: 503 });
     }
     throw error;
   }

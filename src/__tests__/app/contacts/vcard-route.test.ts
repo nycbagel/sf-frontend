@@ -43,11 +43,12 @@ describe("GET /contacts/[id]/vcard", () => {
       http.get(api("/api/v1/contacts/:id/vcard"), () => HttpResponse.error()),
     );
 
+    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
     const res = await get("1");
+    spy.mockRestore();
 
     expect(res.status).toBe(503);
-    await expect(res.json()).resolves.toMatchObject({
-      detail: expect.stringContaining("Could not reach the API"),
-    });
+    // The API's address never reaches the browser; it is logged server-side.
+    await expect(res.json()).resolves.toEqual({ detail: "Could not reach the Contacts API." });
   });
 });

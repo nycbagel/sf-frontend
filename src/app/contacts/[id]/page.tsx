@@ -7,7 +7,8 @@ import AddressTypeBadge from "@/components/contacts/AddressTypeBadge";
 import ContactAvatar from "@/components/contacts/ContactAvatar";
 import DeleteContactButton from "@/components/contacts/DeleteContactButton";
 import { buttonClasses } from "@/components/ui/Button";
-import { getContact } from "@/lib/contacts/api";
+import QrCode from "@/components/ui/QrCode";
+import { getContact, getContactVcard } from "@/lib/contacts/api";
 import { addressLine, formatTimestamp, jobLine, mapsHref } from "@/lib/contacts/format";
 import { ADDRESS_TYPES, type Address } from "@/lib/contacts/types";
 
@@ -85,6 +86,10 @@ export default async function ContactDetailPage({ params }: PageProps) {
   if (!contact) notFound();
 
   const subtitle = jobLine(contact);
+  // The compact card (no inline photo) is what the QR encodes; the photo is
+  // tens of KB and travels with the download instead.
+  const compactCard = await getContactVcard(contact.id, { photo: false });
+  const vcardText = compactCard ? await compactCard.text() : null;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
@@ -135,6 +140,23 @@ export default async function ContactDetailPage({ params }: PageProps) {
           />
         </div>
       </header>
+
+      {vcardText ? (
+        <figure className="flex flex-wrap items-center gap-5 rounded-lg border border-border bg-card p-4">
+          <QrCode
+            text={vcardText}
+            label={`Scan to save ${contact.full_name}`}
+            className="h-40 w-40 shrink-0 p-1 ring-1 ring-border"
+          />
+          <figcaption className="min-w-0 space-y-1">
+            <p className="font-medium text-foreground">Scan to save</p>
+            <p className="text-sm text-muted-foreground">
+              Point a phone camera at the code to add {contact.first_name} — addresses
+              included — to its contacts. The photo travels with the download.
+            </p>
+          </figcaption>
+        </figure>
+      ) : null}
 
       <dl className="rounded-lg border border-border bg-card">
         <Row label="Email">

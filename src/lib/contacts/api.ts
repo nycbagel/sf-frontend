@@ -99,8 +99,12 @@ export async function deleteContact(id: number): Promise<void> {
  * Returns the raw `Response` (not parsed) so the route handler can pass the
  * body and the API's `Content-Type` / `Content-Disposition` straight through.
  */
-export async function getContactVcard(id: number): Promise<Response | null> {
-  const res = await apiFetch(`${CONTACTS_PATH}/${id}/vcard`, {
+export async function getContactVcard(
+  id: number,
+  { photo = true }: { photo?: boolean } = {},
+): Promise<Response | null> {
+  // `photo: false` asks for the compact card (no inline PHOTO) that a QR code can hold.
+  const res = await apiFetch(`${CONTACTS_PATH}/${id}/vcard${photo ? "" : "?photo=false"}`, {
     cache: "no-store",
     headers: { Accept: "text/vcard" },
   });

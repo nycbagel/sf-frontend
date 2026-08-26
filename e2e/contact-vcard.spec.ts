@@ -32,6 +32,7 @@ test.describe('Contact vCard export', () => {
     await row.getByLabel('City').fill('Arlington')
     await page.getByRole('button', { name: 'Create contact' }).click()
     await expect(page.getByRole('heading', { level: 1, name: fullName })).toBeVisible()
+    await expect(page.getByRole('img', { name: `Scan to save ${fullName}` })).toBeVisible()
 
     const downloadPromise = page.waitForEvent('download')
     await page.getByRole('link', { name: 'Download vCard' }).click()

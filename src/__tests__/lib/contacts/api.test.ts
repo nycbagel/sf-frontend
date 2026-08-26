@@ -99,6 +99,13 @@ describe("getContactVcard", () => {
     await expect(getContactVcard(4242)).resolves.toBeNull();
   });
 
+  it("asks for the compact card without the photo only when told to", async () => {
+    await expect((await getContactVcard(1))!.text()).resolves.toContain("PHOTO;");
+    await expect((await getContactVcard(1, { photo: false }))!.text()).resolves.not.toContain(
+      "PHOTO;",
+    );
+  });
+
   it("still throws on other failures", async () => {
     server.use(
       http.get(api("/api/v1/contacts/:id/vcard"), () =>
