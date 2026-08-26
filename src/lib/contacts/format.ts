@@ -54,3 +54,14 @@ export function addressLine(address: Omit<Address, "id" | "type">): string | nul
 
   return parts.length ? parts.join(", ") : null;
 }
+
+const MAPS_SEARCH_URL = "https://maps.apple.com/?q=";
+
+/**
+ * Link that opens the address in Maps (the native app on macOS/iOS; a web map
+ * elsewhere). `null` when there is nothing to search for.
+ */
+export function mapsHref(address: Omit<Address, "id" | "type">): string | null {
+  const line = addressLine(address);
+  return line ? `${MAPS_SEARCH_URL}${encodeURIComponent(line)}` : null;
+}
