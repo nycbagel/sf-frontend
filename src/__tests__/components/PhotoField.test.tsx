@@ -31,7 +31,7 @@ function stubImagePipeline() {
       }),
   );
   HTMLCanvasElement.prototype.getContext = jest.fn(
-    () => ({ drawImage: jest.fn() }) as unknown as CanvasRenderingContext2D,
+    () => ({ fillRect: jest.fn(), drawImage: jest.fn() }) as unknown as CanvasRenderingContext2D,
   ) as unknown as typeof HTMLCanvasElement.prototype.getContext;
   let calls = 0;
   HTMLCanvasElement.prototype.toDataURL = jest.fn(() => `data:image/jpeg;base64,resized${++calls}`);
@@ -140,6 +140,31 @@ describe("PhotoField", () => {
       await waitFor(() =>
         expect(hiddenInput(container)).toHaveValue("data:image/jpeg;base64,resized2"),
       );
+    } finally {
+      pipeline.restore();
+    }
+  });
+
+  it("reports a file it cannot decode and keeps the current photo", async () => {
+    const pipeline = stubImagePipeline();
+    (globalThis as { createImageBitmap?: unknown }).createImageBitmap = jest.fn(() =>
+      Promise.reject(new Error("undecodable")),
+    );
+    try {
+      const { container } = render(
+        <PhotoField field={photoField} defaultValue={PHOTO} />,
+      );
+
+      await userEvent.upload(
+        screen.getByLabelText(/photo/i),
+        new File([], "empty.png", { type: "image/png" }),
+      );
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "That file could not be read as an image.",
+      );
+      expect(hiddenInput(container)).toHaveValue(PHOTO);
+      expect(screen.getByRole("button", { name: "Change photo" })).toBeEnabled();
     } finally {
       pipeline.restore();
     }

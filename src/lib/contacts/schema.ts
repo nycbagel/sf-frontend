@@ -107,7 +107,7 @@ export const CONTACT_FIELD_GROUPS: ContactFieldGroup[] = [
     fields: [
       {
         name: "photo",
-        label: "Photo",
+        label: "Profile photo",
         type: "photo",
         // A 512 KB image is ~700 K characters once base64-encoded.
         maxLength: 700_000,

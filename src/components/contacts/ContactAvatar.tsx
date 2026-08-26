@@ -20,7 +20,8 @@ export default function ContactAvatar({
   contact: Pick<Contact, "first_name" | "last_name" | "email" | "photo">;
   size?: keyof typeof SIZES;
 }) {
-  const shape = `shrink-0 rounded-full ${SIZES[size]}`;
+  // The hairline ring is shared so photo and initials rows line up in a list.
+  const shape = `shrink-0 rounded-full ring-1 ring-border ${SIZES[size]}`;
 
   if (contact.photo) {
     return (
@@ -30,7 +31,8 @@ export default function ContactAvatar({
       <img
         src={contact.photo}
         alt={`Photo of ${contact.first_name} ${contact.last_name}`}
-        className={`${shape} aspect-square object-cover ring-1 ring-border`}
+        decoding="async"
+        className={`${shape} aspect-square object-cover`}
       />
     );
   }

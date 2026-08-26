@@ -20,6 +20,10 @@ async function toSquareDataUrl(file: File): Promise<string> {
 
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvas 2D is not available");
+    // JPEG has no alpha: paint the canvas white first so a transparent PNG
+    // gets a white background instead of the encoder's black.
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, PHOTO_EDGE_PX, PHOTO_EDGE_PX);
     context.drawImage(
       bitmap,
       (bitmap.width - edge) / 2,
@@ -150,6 +154,9 @@ export default function PhotoField({
             onChange={handleChange}
             aria-invalid={message ? true : undefined}
             aria-describedby={message ? errorId : undefined}
+            // Out of the tab order: the button below is the keyboard control;
+            // the input keeps its <label> so it stays the labelled "photo" field.
+            tabIndex={-1}
             className="sr-only"
           />
           <Button
@@ -159,7 +166,7 @@ export default function PhotoField({
             onClick={() => fileInput.current?.click()}
           >
             {busy ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
             ) : null}
             {busy ? "Processing…" : photo ? "Change photo" : "Upload photo"}
           </Button>
