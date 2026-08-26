@@ -134,7 +134,9 @@ e2e/                      Playwright specs (run against the real API)
 - **Forms** — one source of truth: `CONTACT_FIELD_GROUPS` in
   `src/lib/contacts/schema.ts` drives both the rendered fields and the Zod rules,
   which mirror the API's own limits. Submitting is a real form `action`, so it
-  works before hydration; `useActionState` surfaces what comes back.
+  works before hydration; `useActionState` surfaces what comes back. The
+  repeatable address rows (`AddressesField`) post as `addresses[i].<field>`
+  inputs and are regrouped by `formDataToValues`, so they ride the same POST.
 - **Styling** — Tailwind against semantic CSS variables (`bg-background`,
   `text-muted-foreground`, `border-hairline`, …) defined in `src/app/globals.css`.
   Dark is the default; light lives under `[data-theme="light"]`. Add colours as

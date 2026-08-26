@@ -1,4 +1,4 @@
-import type { ContactFieldSpec } from "@/lib/contacts/schema";
+import type { FieldSpec } from "@/lib/contacts/schema";
 
 const CONTROL =
   "w-full rounded-md border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 transition-colors focus:bg-input";
@@ -12,7 +12,7 @@ export default function Field({
   defaultValue,
   error,
 }: {
-  field: ContactFieldSpec;
+  field: FieldSpec;
   defaultValue?: string;
   error?: string;
 }) {
@@ -26,13 +26,15 @@ export default function Field({
     id,
     name: field.name,
     defaultValue,
-    maxLength: field.maxLength,
     required: field.required,
-    placeholder: field.placeholder,
-    autoComplete: field.autoComplete,
     "aria-invalid": error ? true : undefined,
     "aria-describedby": error ? errorId : undefined,
     className: `${CONTROL} ${borderClass}`,
+  };
+  const text = {
+    maxLength: field.maxLength,
+    placeholder: field.placeholder,
+    autoComplete: field.autoComplete,
   };
 
   return (
@@ -46,7 +48,7 @@ export default function Field({
           <span className="ml-1 text-destructive" aria-hidden="true">
             *
           </span>
-        ) : (
+        ) : field.type === "select" ? null : (
           <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
             optional
           </span>
@@ -54,9 +56,22 @@ export default function Field({
       </label>
 
       {field.type === "textarea" ? (
-        <textarea {...shared} rows={4} className={`${shared.className} resize-y`} />
+        <textarea
+          {...shared}
+          {...text}
+          rows={4}
+          className={`${shared.className} resize-y`}
+        />
+      ) : field.type === "select" ? (
+        <select {...shared}>
+          {field.options?.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       ) : (
-        <input {...shared} type={field.type ?? "text"} />
+        <input {...shared} {...text} type={field.type ?? "text"} />
       )}
 
       {error ? (
