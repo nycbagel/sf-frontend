@@ -84,6 +84,25 @@ export const handlers = [
         );
   }),
 
+  http.get(api("/api/v1/contacts/:id/vcard"), ({ params }) => {
+    const contact = CONTACTS.find((c) => c.id === Number(params.id));
+    if (!contact) {
+      return HttpResponse.json(
+        { detail: `Contact ${params.id} not found` },
+        { status: 404 },
+      );
+    }
+    return new HttpResponse(
+      `BEGIN:VCARD\r\nVERSION:3.0\r\nFN:${contact.full_name}\r\nEND:VCARD\r\n`,
+      {
+        headers: {
+          "Content-Type": "text/vcard; charset=utf-8",
+          "Content-Disposition": 'attachment; filename="ada-lovelace.vcf"',
+        },
+      },
+    );
+  }),
+
   http.post(api("/api/v1/contacts"), async ({ request }) => {
     const body = (await request.json()) as Partial<Contact>;
     return HttpResponse.json(makeContact({ ...body, id: 99 }), { status: 201 });
