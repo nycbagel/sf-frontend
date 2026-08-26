@@ -54,6 +54,13 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [{ source: "/", destination: "/contacts", permanent: true }];
   },
+  experimental: {
+    // A contact photo rides inside the form post as a base64 data URL. The
+    // browser downscales it first (see PhotoField), so real payloads are tens
+    // of KB, but the API's 512 KB cap encodes to ~700 KB — too close to the
+    // 1 MB default to leave to chance.
+    serverActions: { bodySizeLimit: "2mb" },
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: appVersion,
     NEXT_PUBLIC_BUILD_NUMBER: buildNumber,
