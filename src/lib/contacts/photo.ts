@@ -14,7 +14,20 @@ export const PHOTO_MAX_BYTES = 512 * 1024;
 /** Square edge the browser downscales uploads to before they leave the page. */
 export const PHOTO_EDGE_PX = 256;
 
-const DATA_URL = /^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/;
+/**
+ * Largest file the picker will decode. The output is bounded by the resize, but
+ * `createImageBitmap` has to decode the source first, so an enormous or highly
+ * compressed image would otherwise be decompressed in full before it shrank.
+ */
+export const PHOTO_MAX_SOURCE_BYTES = 20 * 1024 * 1024;
+
+/** Largest source image the picker will decode, per side. */
+export const PHOTO_MAX_SOURCE_EDGE_PX = 12_000;
+
+// Canonical base64: whole four-character groups, with only the final group
+// allowed to be padded (`AA==`, `AAA=`). Anything else cannot decode.
+const DATA_URL =
+  /^data:image\/(?:png|jpeg|webp);base64,(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 /** Bytes a base64 payload decodes to, worked out from its length alone. */
 export function decodedByteLength(base64: string): number {
@@ -25,7 +38,7 @@ export function decodedByteLength(base64: string): number {
 export const photoDataUrlSchema = z
   .string()
   .refine(
-    (value) => DATA_URL.test(value),
+    (value) => DATA_URL.test(value) && value.length > "data:image/png;base64,".length,
     "Photo must be a PNG, JPEG, or WebP image",
   )
   .refine(

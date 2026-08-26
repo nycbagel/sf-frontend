@@ -3,16 +3,39 @@
 import { useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
 import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import Button from "@/components/ui/Button";
-import { PHOTO_EDGE_PX, PHOTO_MEDIA_TYPES } from "@/lib/contacts/photo";
+import {
+  PHOTO_EDGE_PX,
+  PHOTO_MAX_SOURCE_BYTES,
+  PHOTO_MAX_SOURCE_EDGE_PX,
+  PHOTO_MEDIA_TYPES,
+} from "@/lib/contacts/photo";
 import type { ContactFieldSpec } from "@/lib/contacts/schema";
+
+/** Thrown when a chosen file is too large to decode; shown to the user as-is. */
+class PhotoTooLargeError extends Error {}
 
 /**
  * Centre-crop to a square and downscale, so what we store is a small data URL
  * (tens of KB as JPEG) no matter how large the chosen file was.
+ *
+ * The output is bounded by the resize, but the source has to be decoded first,
+ * so both its byte size and its pixel dimensions are checked before and after
+ * `createImageBitmap` — a decompression bomb never reaches the canvas.
  */
 async function toSquareDataUrl(file: File): Promise<string> {
+  if (file.size > PHOTO_MAX_SOURCE_BYTES) {
+    throw new PhotoTooLargeError(
+      `That image is ${Math.round(file.size / 1024 / 1024)} MB. Choose one under ${PHOTO_MAX_SOURCE_BYTES / 1024 / 1024} MB.`,
+    );
+  }
+
   const bitmap = await createImageBitmap(file);
   try {
+    if (bitmap.width > PHOTO_MAX_SOURCE_EDGE_PX || bitmap.height > PHOTO_MAX_SOURCE_EDGE_PX) {
+      throw new PhotoTooLargeError(
+        `That image is ${bitmap.width}×${bitmap.height} pixels. Choose one under ${PHOTO_MAX_SOURCE_EDGE_PX} pixels per side.`,
+      );
+    }
     const edge = Math.min(bitmap.width, bitmap.height);
     const canvas = document.createElement("canvas");
     canvas.width = PHOTO_EDGE_PX;
@@ -99,9 +122,13 @@ export default function PhotoField({
       if (sequence !== readSequence.current) return;
       setPhoto(dataUrl);
       setReadError(undefined);
-    } catch {
+    } catch (error) {
       if (sequence !== readSequence.current) return;
-      setReadError("That file could not be read as an image.");
+      setReadError(
+        error instanceof PhotoTooLargeError
+          ? error.message
+          : "That file could not be read as an image.",
+      );
     } finally {
       if (sequence === readSequence.current) setBusyState(false);
     }
@@ -171,7 +198,7 @@ export default function PhotoField({
             {busy ? "Processing…" : photo ? "Change photo" : "Upload photo"}
           </Button>
           {photo ? (
-            <Button variant="ghost" size="sm" disabled={busy} onClick={removePhoto}>
+            <Button variant="ghost" size="sm" disabled={pickerDisabled} onClick={removePhoto}>
               <Trash2 className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
               Remove
             </Button>

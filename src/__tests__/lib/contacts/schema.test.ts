@@ -1,4 +1,4 @@
-import { PHOTO_MAX_BYTES } from "@/lib/contacts/photo";
+import { PHOTO_MAX_BYTES, photoDataUrlSchema } from "@/lib/contacts/photo";
 import {
   CONTACT_FIELDS,
   contactInputSchema,
@@ -114,5 +114,24 @@ describe("formDataToValues", () => {
     expect(Object.keys(extracted).sort()).toEqual(
       CONTACT_FIELDS.map((field) => field.name).sort(),
     );
+  });
+});
+
+describe("photo data URLs must be canonical base64", () => {
+  it.each([
+    ["data:image/png;base64,A", "a lone character"],
+    ["data:image/png;base64,A=", "an impossible one-character group"],
+    ["data:image/png;base64,AA=", "a short padded group"],
+    ["data:image/png;base64,", "an empty payload"],
+  ])("rejects %s (%s)", (value) => {
+    expect(photoDataUrlSchema.safeParse(value).success).toBe(false);
+  });
+
+  it.each([
+    "data:image/png;base64,AAAA",
+    "data:image/png;base64,AA==",
+    "data:image/jpeg;base64,AAA=",
+  ])("accepts %s", (value) => {
+    expect(photoDataUrlSchema.safeParse(value).success).toBe(true);
   });
 });

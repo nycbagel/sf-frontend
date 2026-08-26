@@ -18,7 +18,7 @@ function hiddenInput(container: HTMLElement): HTMLInputElement {
  * jsdom has no image decoding or canvas. Stand in for both: `createImageBitmap`
  * resolves when the test says so, and the canvas hands back a fixed data URL.
  */
-function stubImagePipeline() {
+function stubImagePipeline(size: { width: number; height: number } = { width: 4, height: 4 }) {
   const pending: Array<() => void> = [];
   const nativeBitmap = (globalThis as { createImageBitmap?: unknown }).createImageBitmap;
   const nativeGetContext = HTMLCanvasElement.prototype.getContext;
@@ -27,7 +27,7 @@ function stubImagePipeline() {
   (globalThis as { createImageBitmap?: unknown }).createImageBitmap = jest.fn(
     () =>
       new Promise((resolve) => {
-        pending.push(() => resolve({ width: 4, height: 4, close: jest.fn() }));
+        pending.push(() => resolve({ ...size, close: jest.fn() }));
       }),
   );
   HTMLCanvasElement.prototype.getContext = jest.fn(
@@ -175,5 +175,46 @@ describe("PhotoField", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("Photo is too large");
     expect(screen.getByLabelText(/photo/i)).toHaveAttribute("aria-invalid", "true");
+  });
+});
+
+describe("PhotoField source-file bounds and pre-hydration state", () => {
+  it("rejects a file that is too large to decode before touching the decoder", async () => {
+    const pipeline = stubImagePipeline();
+    try {
+      render(<PhotoField field={photoField} />);
+      const huge = new File(["x"], "huge.png", { type: "image/png" });
+      Object.defineProperty(huge, "size", { value: 21 * 1024 * 1024 });
+
+      await userEvent.upload(screen.getByLabelText(/photo/i), huge);
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(/Choose one under 20 MB/);
+      expect(globalThis.createImageBitmap).not.toHaveBeenCalled();
+    } finally {
+      pipeline.restore();
+    }
+  });
+
+  it("rejects an image whose pixel dimensions are unreasonable", async () => {
+    const pipeline = stubImagePipeline({ width: 20_000, height: 20_000 });
+    try {
+      render(<PhotoField field={photoField} />);
+      await userEvent.upload(
+        screen.getByLabelText(/photo/i),
+        new File(["x"], "bomb.png", { type: "image/png" }),
+      );
+      pipeline.finishNextRead();
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(/20000×20000 pixels/);
+    } finally {
+      pipeline.restore();
+    }
+  });
+
+  it("keeps Remove disabled until it has hydrated, like the picker", () => {
+    // Removal is a client handler: before hydration the control must not look actionable.
+    const markup = renderToStaticMarkup(<PhotoField field={photoField} defaultValue={PHOTO} />);
+    const removeButton = markup.slice(0, markup.indexOf("Remove"));
+    expect(removeButton.slice(removeButton.lastIndexOf("<button"))).toContain("disabled=\"\"");
   });
 });
