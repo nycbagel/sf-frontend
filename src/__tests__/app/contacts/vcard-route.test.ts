@@ -38,6 +38,30 @@ describe("GET /contacts/[id]/vcard", () => {
     expect(res.status).toBe(404);
   });
 
+  it.each(["1abc", "1.5", " 1", "01x", "abc"])(
+    "is a 404 for the malformed id %p rather than serving a nearby contact",
+    async (id) => {
+      // `parseInt` would read "1abc" as contact 1 and hand back Ada's card.
+      const res = await get(id);
+
+      expect(res.status).toBe(404);
+      await expect(res.json()).resolves.toEqual({ detail: "Contact not found" });
+    },
+  );
+
+  it("keeps the API's status when it refuses for its own reasons", async () => {
+    server.use(
+      http.get(api("/api/v1/contacts/:id/vcard"), () =>
+        HttpResponse.json({ detail: "Too many requests" }, { status: 429 }),
+      ),
+    );
+
+    const res = await get("1");
+
+    expect(res.status).toBe(429);
+    await expect(res.json()).resolves.toEqual({ detail: "Too many requests" });
+  });
+
   it("reports an unreachable API as 503 rather than crashing", async () => {
     server.use(
       http.get(api("/api/v1/contacts/:id/vcard"), () => HttpResponse.error()),

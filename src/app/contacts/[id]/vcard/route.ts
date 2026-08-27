@@ -1,5 +1,5 @@
-import { ApiUnreachableError } from "@/lib/apiClient";
-import { getContactVcard } from "@/lib/contacts/api";
+import { ApiError, ApiUnreachableError } from "@/lib/apiClient";
+import { apiErrorMessage, getContactVcard } from "@/lib/contacts/api";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -20,8 +20,13 @@ export async function GET(
   _request: Request,
   { params }: RouteContext,
 ): Promise<Response> {
-  const id = Number.parseInt((await params).id, 10);
-  if (!Number.isInteger(id) || id < 1) {
+  // Digits only: `parseInt` would read "1abc" as contact 1 and serve that card.
+  const raw = (await params).id;
+  if (!/^\d+$/.test(raw)) {
+    return Response.json({ detail: "Contact not found" }, { status: 404 });
+  }
+  const id = Number(raw);
+  if (id < 1 || !Number.isSafeInteger(id)) {
     return Response.json({ detail: "Contact not found" }, { status: 404 });
   }
 
@@ -32,6 +37,15 @@ export async function GET(
     if (error instanceof ApiUnreachableError) {
       console.error(error);
       return Response.json({ detail: UNAVAILABLE }, { status: 503 });
+    }
+    if (error instanceof ApiError) {
+      // Anything the API refused for its own reasons (401, 403, 429, 5xx): keep
+      // its status rather than turning a handled refusal into a route crash.
+      console.error(error);
+      return Response.json(
+        { detail: apiErrorMessage(error, "The vCard could not be exported.") },
+        { status: error.status },
+      );
     }
     throw error;
   }

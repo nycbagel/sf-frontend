@@ -14,6 +14,23 @@ import { ADDRESS_TYPES, type Address } from "@/lib/contacts/types";
 
 type PageProps = { params: Promise<{ id: string }> };
 
+/**
+ * The compact card (no inline photo) that the QR encodes — the photo is tens of
+ * KB and travels with the download instead.
+ *
+ * The QR is a convenience, so it is never allowed to take the page down with
+ * it: any failure here returns `null` and the section is simply left out.
+ */
+async function compactCardText(contactId: number): Promise<string | null> {
+  try {
+    const card = await getContactVcard(contactId, { photo: false });
+    return card ? await card.text() : null;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+
 function parseId(raw: string): number {
   const id = Number.parseInt(raw, 10);
   if (!Number.isInteger(id) || id < 1) notFound();
@@ -86,10 +103,7 @@ export default async function ContactDetailPage({ params }: PageProps) {
   if (!contact) notFound();
 
   const subtitle = jobLine(contact);
-  // The compact card (no inline photo) is what the QR encodes; the photo is
-  // tens of KB and travels with the download instead.
-  const compactCard = await getContactVcard(contact.id, { photo: false });
-  const vcardText = compactCard ? await compactCard.text() : null;
+  const vcardText = await compactCardText(contact.id);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
