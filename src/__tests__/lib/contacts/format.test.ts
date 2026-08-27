@@ -4,6 +4,7 @@ import {
   formatTimestamp,
   initials,
   jobLine,
+  mapsHref,
 } from "@/lib/contacts/format";
 import { makeContact } from "../../mocks/handlers";
 
@@ -50,21 +51,39 @@ describe("jobLine", () => {
 });
 
 describe("addressLine", () => {
+  const home = makeContact().addresses[0];
+
   it("skips the parts that are not filled in", () => {
-    expect(addressLine(makeContact())).toBe("San Francisco, CA, USA");
+    expect(addressLine(home)).toBe("San Francisco, CA, USA");
   });
 
   it("pairs the state with the postal code", () => {
     expect(
-      addressLine(makeContact({ address: "1 Market St", postal_code: "94105" })),
+      addressLine({ ...home, street: "1 Market St", postal_code: "94105" }),
     ).toBe("1 Market St, San Francisco, CA 94105, USA");
   });
 
-  it("returns null when there is no address at all", () => {
+  it("returns null when every part is blank", () => {
     expect(
-      addressLine(
-        makeContact({ city: null, state: null, country: null, postal_code: null }),
-      ),
+      addressLine({ ...home, city: null, state: null, country: null }),
     ).toBeNull();
+  });
+});
+
+describe("mapsHref", () => {
+  const home = makeContact().addresses[0];
+
+  it("searches Maps for the full address line", () => {
+    expect(mapsHref({ ...home, street: "1 Market St", postal_code: "94105" })).toBe(
+      "https://maps.apple.com/?q=1%20Market%20St%2C%20San%20Francisco%2C%20CA%2094105%2C%20USA",
+    );
+  });
+
+  it("encodes characters that would break the query", () => {
+    expect(mapsHref({ ...home, street: "Pier 39 & Bay #2" })).toContain("Pier%2039%20%26%20Bay%20%232");
+  });
+
+  it("is null when there is nothing to search for", () => {
+    expect(mapsHref({ ...home, city: null, state: null, country: null })).toBeNull();
   });
 });

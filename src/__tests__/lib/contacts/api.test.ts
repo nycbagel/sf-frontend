@@ -24,11 +24,7 @@ const INPUT: ContactInput = {
   phone: null,
   company: null,
   job_title: null,
-  address: null,
-  city: null,
-  state: null,
-  postal_code: null,
-  country: null,
+  addresses: [{ type: "work", street: null, city: "Arlington", state: "VA", postal_code: null, country: "USA" }],
   notes: null,
   photo: null,
 };
@@ -159,6 +155,25 @@ describe("error translation", () => {
     expect(toFieldErrors(error)).toEqual({
       email: "value is not a valid email address",
       first_name: "String should have at least 1 character",
+    });
+  });
+
+  it("reports an address problem against the address list, numbered by row", () => {
+    const error = new ApiError(
+      422,
+      JSON.stringify({
+        detail: [
+          {
+            loc: ["body", "addresses", 1, "postal_code"],
+            msg: "String should have at most 20 characters",
+          },
+          { loc: ["body", "addresses", 0, "city"], msg: "ignored: first one wins" },
+        ],
+      }),
+    );
+
+    expect(toFieldErrors(error)).toEqual({
+      addresses: "Address 2: String should have at most 20 characters",
     });
   });
 

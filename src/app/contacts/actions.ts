@@ -11,11 +11,12 @@ import {
   toFieldErrors,
 } from "@/lib/contacts/api";
 import {
+  addressToFormValues,
   contactInputSchema,
   formDataToValues,
   zodFieldErrors,
 } from "@/lib/contacts/schema";
-import type { Contact, FormState } from "@/lib/contacts/types";
+import type { Contact, ContactFormValues, FormState } from "@/lib/contacts/types";
 
 /** Mutations for the contacts UI. Every one of these runs only on the server. */
 
@@ -50,6 +51,14 @@ export async function saveContactAction(
     };
   }
 
+  // Past validation the form echoes the addresses that were actually sent, not
+  // the raw rows: blank ones were dropped, so any row the API numbers in a 422
+  // is the row the user sees under that number.
+  const sent: ContactFormValues = {
+    ...values,
+    addresses: parsed.data.addresses.map(addressToFormValues),
+  };
+
   let saved: Contact;
   try {
     saved =
@@ -58,7 +67,7 @@ export async function saveContactAction(
         : await replaceContact(contactId, parsed.data);
   } catch (error) {
     if (error instanceof ApiUnreachableError) {
-      return { status: "error", message: UNREACHABLE, values };
+      return { status: "error", message: UNREACHABLE, values: sent };
     }
     if (error instanceof ApiError) {
       if (error.status === 409) {
@@ -68,7 +77,7 @@ export async function saveContactAction(
           fieldErrors: {
             email: apiErrorMessage(error, "This email is already in use."),
           },
-          values,
+          values: sent,
         };
       }
       if (error.status === 422) {
@@ -76,13 +85,13 @@ export async function saveContactAction(
           status: "error",
           message: "The API rejected these values.",
           fieldErrors: toFieldErrors(error),
-          values,
+          values: sent,
         };
       }
       return {
         status: "error",
         message: apiErrorMessage(error, "The contact could not be saved."),
-        values,
+        values: sent,
       };
     }
     throw error;

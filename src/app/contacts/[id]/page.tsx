@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, Pencil } from "lucide-react";
+import { ChevronLeft, MapPin, Pencil } from "lucide-react";
+import AddressTypeBadge from "@/components/contacts/AddressTypeBadge";
 import ContactAvatar from "@/components/contacts/ContactAvatar";
 import DeleteContactButton from "@/components/contacts/DeleteContactButton";
 import { buttonClasses } from "@/components/ui/Button";
 import { getContact } from "@/lib/contacts/api";
-import { addressLine, formatTimestamp, jobLine } from "@/lib/contacts/format";
+import { addressLine, formatTimestamp, jobLine, mapsHref } from "@/lib/contacts/format";
+import { ADDRESS_TYPES, type Address } from "@/lib/contacts/types";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -38,12 +40,51 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/** Addresses grouped by kind — home, then work, then other — one badge per group. */
+function AddressGroups({ addresses }: { addresses: Address[] }) {
+  return (
+    <div className="space-y-2">
+      {ADDRESS_TYPES.map((type) => {
+        const group = addresses.filter((address) => address.type === type);
+        if (group.length === 0) return null;
+        return (
+          <div key={type} className="flex flex-wrap items-start gap-2">
+            <AddressTypeBadge type={type} />
+            <ul className="min-w-0 space-y-1">
+              {group.map((address) => {
+                const href = mapsHref(address);
+                return (
+                  <li key={address.id}>
+                    {href ? (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 hover:text-primary hover:underline"
+                      >
+                        <address className="not-italic">{addressLine(address)}</address>
+                        <MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                        <span className="sr-only">(opens in Maps)</span>
+                      </a>
+                    ) : (
+                      <address className="not-italic">{addressLine(address)}</address>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default async function ContactDetailPage({ params }: PageProps) {
   const contact = await getContact(parseId((await params).id));
   if (!contact) notFound();
 
   const subtitle = jobLine(contact);
-  const address = addressLine(contact);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
@@ -102,7 +143,11 @@ export default async function ContactDetailPage({ params }: PageProps) {
         </Row>
         <Row label="Company">{contact.company}</Row>
         <Row label="Job title">{contact.job_title}</Row>
-        <Row label="Address">{address}</Row>
+        <Row label="Addresses">
+          {contact.addresses.length > 0 ? (
+            <AddressGroups addresses={contact.addresses} />
+          ) : null}
+        </Row>
         <Row label="Notes">
           {contact.notes ? (
             <span className="whitespace-pre-wrap">{contact.notes}</span>

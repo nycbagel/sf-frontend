@@ -1,17 +1,21 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { AlertCircle, Loader2 } from "lucide-react";
+import AddressesField from "@/components/contacts/AddressesField";
 import Field from "@/components/ui/Field";
 import PhotoField from "./PhotoField";
 import Button, { buttonClasses } from "@/components/ui/Button";
-import { CONTACT_FIELD_GROUPS } from "@/lib/contacts/schema";
+import {
+  CONTACT_FIELD_GROUPS,
+  addressToFormValues,
+} from "@/lib/contacts/schema";
 import {
   EMPTY_FORM_STATE,
   type Contact,
-  type ContactInput,
+  type ContactTextField,
   type FormState,
 } from "@/lib/contacts/types";
 
@@ -54,9 +58,16 @@ export default function ContactForm({
   // the hidden `photo` input never posts a stale value.
   const [photoBusy, setPhotoBusy] = useState(false);
 
-  function valueFor(name: keyof ContactInput): string {
+  function valueFor(name: ContactTextField): string {
     return state.values?.[name] ?? contact?.[name] ?? "";
   }
+
+  // Memoised so the rows only re-seed when the echoed submission changes.
+  const contactAddresses = useMemo(
+    () => contact?.addresses.map(addressToFormValues) ?? [],
+    [contact],
+  );
+  const addresses = state.values?.addresses ?? contactAddresses;
 
   return (
     <form action={formAction} noValidate className="space-y-8">
@@ -87,26 +98,33 @@ export default function ContactForm({
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            {group.fields.map((field) =>
-              field.type === "photo" ? (
-                <PhotoField
-                  key={field.name}
-                  field={field}
-                  defaultValue={valueFor(field.name)}
-                  error={state.fieldErrors?.[field.name]}
-                  onBusyChange={setPhotoBusy}
-                />
-              ) : (
-                <Field
-                  key={field.name}
-                  field={field}
-                  defaultValue={valueFor(field.name)}
-                  error={state.fieldErrors?.[field.name]}
-                />
-              ),
-            )}
-          </div>
+          {group.kind === "addresses" ? (
+            <AddressesField
+              initial={addresses}
+              error={state.fieldErrors?.addresses}
+            />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {group.fields.map((field) =>
+                field.type === "photo" ? (
+                  <PhotoField
+                    key={field.name}
+                    field={field}
+                    defaultValue={valueFor(field.name)}
+                    error={state.fieldErrors?.[field.name]}
+                    onBusyChange={setPhotoBusy}
+                  />
+                ) : (
+                  <Field
+                    key={field.name}
+                    field={field}
+                    defaultValue={valueFor(field.name)}
+                    error={state.fieldErrors?.[field.name]}
+                  />
+                ),
+              )}
+            </div>
+          )}
         </fieldset>
       ))}
 
