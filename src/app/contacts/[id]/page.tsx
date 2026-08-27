@@ -2,16 +2,34 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, MapPin, Pencil } from "lucide-react";
+import { ChevronLeft, Download, MapPin, Pencil } from "lucide-react";
 import AddressTypeBadge from "@/components/contacts/AddressTypeBadge";
 import ContactAvatar from "@/components/contacts/ContactAvatar";
 import DeleteContactButton from "@/components/contacts/DeleteContactButton";
 import { buttonClasses } from "@/components/ui/Button";
-import { getContact } from "@/lib/contacts/api";
+import QrCode from "@/components/ui/QrCode";
+import { getContact, getContactVcard } from "@/lib/contacts/api";
 import { addressLine, formatTimestamp, jobLine, mapsHref } from "@/lib/contacts/format";
 import { ADDRESS_TYPES, type Address } from "@/lib/contacts/types";
 
 type PageProps = { params: Promise<{ id: string }> };
+
+/**
+ * The compact card (no inline photo) that the QR encodes — the photo is tens of
+ * KB and travels with the download instead.
+ *
+ * The QR is a convenience, so it is never allowed to take the page down with
+ * it: any failure here returns `null` and the section is simply left out.
+ */
+async function compactCardText(contactId: number): Promise<string | null> {
+  try {
+    const card = await getContactVcard(contactId, { photo: false });
+    return card ? await card.text() : null;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
 
 function parseId(raw: string): number {
   const id = Number.parseInt(raw, 10);
@@ -85,6 +103,7 @@ export default async function ContactDetailPage({ params }: PageProps) {
   if (!contact) notFound();
 
   const subtitle = jobLine(contact);
+  const vcardText = await compactCardText(contact.id);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
@@ -110,6 +129,14 @@ export default async function ContactDetailPage({ params }: PageProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <a
+            href={`/contacts/${contact.id}/vcard`}
+            download
+            className={buttonClasses("secondary")}
+          >
+            <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            Download vCard
+          </a>
           <Link
             href={`/contacts/${contact.id}/edit`}
             className={buttonClasses("secondary")}
@@ -127,6 +154,23 @@ export default async function ContactDetailPage({ params }: PageProps) {
           />
         </div>
       </header>
+
+      {vcardText ? (
+        <figure className="flex flex-wrap items-center gap-5 rounded-lg border border-border bg-card p-4">
+          <QrCode
+            text={vcardText}
+            label={`Scan to save ${contact.full_name}`}
+            className="h-40 w-40 shrink-0 p-1 ring-1 ring-border"
+          />
+          <figcaption className="min-w-0 space-y-1">
+            <p className="font-medium text-foreground">Scan to save</p>
+            <p className="text-sm text-muted-foreground">
+              Point a phone camera at the code to add {contact.first_name} — addresses
+              included — to its contacts. The photo travels with the download.
+            </p>
+          </figcaption>
+        </figure>
+      ) : null}
 
       <dl className="rounded-lg border border-border bg-card">
         <Row label="Email">

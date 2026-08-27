@@ -93,8 +93,9 @@ Hand-editing the URL to an ID that does not exist gives you the styled 404 page
 | `/`                  | 308 to `/contacts` (a `redirects()` rule, not a page)             |
 | `/contacts`          | List: search, sort, paginate — all held in the URL                |
 | `/contacts/new`      | Create form                                                       |
-| `/contacts/[id]`     | Detail view with edit/delete                                      |
+| `/contacts/[id]`     | Detail view with edit/delete, vCard download and scan-to-save QR  |
 | `/contacts/[id]/edit`| Edit form (`PUT`, i.e. a full replacement)                        |
+| `/contacts/[id]/vcard`| Route handler: streams the API's vCard export as a `.vcf` download |
 
 ## Layout
 

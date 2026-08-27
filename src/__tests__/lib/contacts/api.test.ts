@@ -7,6 +7,7 @@ import {
   createContact,
   deleteContact,
   getContact,
+  getContactVcard,
   getHealth,
   listContacts,
   toFieldErrors,
@@ -80,6 +81,39 @@ describe("getContact", () => {
     );
 
     await expect(getContact(1)).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe("getContactVcard", () => {
+  it("returns the raw response with the file headers intact", async () => {
+    const res = await getContactVcard(1);
+
+    expect(res?.headers.get("content-type")).toBe("text/vcard; charset=utf-8");
+    expect(res?.headers.get("content-disposition")).toBe(
+      'attachment; filename="ada-lovelace.vcf"',
+    );
+    await expect(res!.text()).resolves.toContain("BEGIN:VCARD");
+  });
+
+  it("returns null on 404 rather than throwing", async () => {
+    await expect(getContactVcard(4242)).resolves.toBeNull();
+  });
+
+  it("asks for the compact card without the photo only when told to", async () => {
+    await expect((await getContactVcard(1))!.text()).resolves.toContain("PHOTO;");
+    await expect((await getContactVcard(1, { photo: false }))!.text()).resolves.not.toContain(
+      "PHOTO;",
+    );
+  });
+
+  it("still throws on other failures", async () => {
+    server.use(
+      http.get(api("/api/v1/contacts/:id/vcard"), () =>
+        HttpResponse.json({ detail: "nope" }, { status: 500 }),
+      ),
+    );
+
+    await expect(getContactVcard(1)).rejects.toBeInstanceOf(ApiError);
   });
 });
 

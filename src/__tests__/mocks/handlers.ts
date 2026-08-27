@@ -84,6 +84,30 @@ export const handlers = [
         );
   }),
 
+  http.get(api("/api/v1/contacts/:id/vcard"), ({ params, request }) => {
+    const contact = CONTACTS.find((c) => c.id === Number(params.id));
+    if (!contact) {
+      return HttpResponse.json(
+        { detail: `Contact ${params.id} not found` },
+        { status: 404 },
+      );
+    }
+    // Like the API: the inline photo is left out only when `?photo=false`.
+    const photo =
+      new URL(request.url).searchParams.get("photo") === "false"
+        ? ""
+        : "PHOTO;ENCODING=b;TYPE=PNG:iVBORw0KGgo=\r\n";
+    return new HttpResponse(
+      `BEGIN:VCARD\r\nVERSION:3.0\r\nFN:${contact.full_name}\r\n${photo}END:VCARD\r\n`,
+      {
+        headers: {
+          "Content-Type": "text/vcard; charset=utf-8",
+          "Content-Disposition": 'attachment; filename="ada-lovelace.vcf"',
+        },
+      },
+    );
+  }),
+
   http.post(api("/api/v1/contacts"), async ({ request }) => {
     const body = (await request.json()) as Partial<Contact>;
     return HttpResponse.json(makeContact({ ...body, id: 99 }), { status: 201 });

@@ -93,6 +93,28 @@ export async function deleteContact(id: number): Promise<void> {
   }
 }
 
+/**
+ * The contact as a vCard file, or `null` when the API reports 404.
+ *
+ * Returns the raw `Response` (not parsed) so the route handler can pass the
+ * body and the API's `Content-Type` / `Content-Disposition` straight through.
+ */
+export async function getContactVcard(
+  id: number,
+  { photo = true }: { photo?: boolean } = {},
+): Promise<Response | null> {
+  // `photo: false` asks for the compact card (no inline PHOTO) that a QR code can hold.
+  const res = await apiFetch(`${CONTACTS_PATH}/${id}/vcard${photo ? "" : "?photo=false"}`, {
+    cache: "no-store",
+    headers: { Accept: "text/vcard" },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new ApiError(res.status, await res.text().catch(() => ""));
+  }
+  return res;
+}
+
 export async function getHealth(): Promise<HealthResponse | null> {
   try {
     // The badge is decoration; never let it hold the page open for long.
