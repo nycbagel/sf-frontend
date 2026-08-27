@@ -4,7 +4,6 @@ import {
   ADDRESS_TYPES,
   ADDRESS_TYPE_LABELS,
   MAX_ADDRESSES,
-  type Address,
   type AddressFormValues,
   type AddressInput,
   type ContactFormValues,
@@ -372,8 +371,11 @@ export function formDataToValues(formData: FormData): ContactFormValues {
   return { ...text, addresses: addressesFromFormData(formData) };
 }
 
-/** A stored address as form strings, so the edit form can prefill its row. */
-export function addressToFormValues(address: Address): AddressFormValues {
+/**
+ * An address as form strings, so a row can be prefilled — from a stored address
+ * on the edit form, or from a validated submission when the API rejects it.
+ */
+export function addressToFormValues(address: AddressInput): AddressFormValues {
   return {
     type: address.type,
     street: address.street ?? "",

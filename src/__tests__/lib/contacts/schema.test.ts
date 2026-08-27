@@ -255,7 +255,6 @@ describe("addressToFormValues", () => {
   it("turns nulls into empty strings for the inputs", () => {
     expect(
       addressToFormValues({
-        id: 3,
         type: "home",
         street: null,
         city: "Oslo",
